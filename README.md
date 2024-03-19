@@ -1,134 +1,80 @@
+## MemorEE
 
-# MemorEE(PROM) 
-[![MIT License](https://img.shields.io/badge/license-MIT-red.svg)](https://choosealicense.com/licenses/mit/)
-
-
-A HAL-based library for interfacing Microchip's 24xx256 (24AA256/24LC256/24FC256) Electrically Erasable Programmable Read-Only Memory (EEPROM) IC with STM32 via I2C.
+Minimal, versatile, portable library for reading from/writing to SPI and I2C memory ICs. 
+This library is mainly aimed at quick and dirty flash dumping/editing operations, as opposed to usage as a driver for applications where high reliablility and maximum throughput (such as XIP) and therefore does not explicitly support a wide variety of chips.
 
 ## Features
+- Transparent read and write operations
+- Automatic address page translation 
+- Optional address wrapping on overflow
+- Automatic memory size detection for SFDP memories
 
-- Read/Write individual bytes
-- Read/Write an entire page
-- Erase an entire page in one command
+## Supported devices
+- I2C EEPROMs
+  - 24XX02
+  - 24XX04
+  - 24XX08
+  - 24XX16
+  - 24XX32
+  - 24XX256 (tested)
+  - 24XX1024
+  
+- SPI EEPROMs
+  - 93C46 (tested)
+  - 93C56
+  - 93C66
+  - 93C76
+  - 93C86
+  
+- SFDP-compatible SPI flash memories (25XX)
 
+## Sample output
+![]()
+![]()
 
-## Installation
+## Porting
 
-1. Copy the 24xx256.h file into 
-```
-    [Your Project Folder] > Core > Inc 
-```
+1. Create an implementation of the functions in [memoree_platform.h](platform/memoree_platform.h) specific to your target platform (and name it memoree_\<your_platform\>.c where `<your_platform>` is a the name of the target platform)
+2. In your application, define the interface of your memory IC by initializing the interface parameters according to the pin and interface port conventions for your platform.
 
-2. Copy the 24xx256.c file into 
-```
-    [Your Project Folder] > Core > Src
-```
+For example, for `24LC256` with on ESP32,
+  ```c
+    memoree_i2c_conf_t i2c_conf =
+        {
+            .addr = 0x50,
+            .port = I2C_NUM_0,
+            .sda_pin = GPIO_NUM_10,
+            .scl_pin = GPIO_NUM_12,
+            .speed = 100000,
+        };
 
-3. Line 7 of 24xx256.h specifies the HAL library for the STM32 board in use.
-    Change it as per your hardware.
-
-    ```c
-    #include "stm32f1xx_hal.h"                      //HAL library for the bluepill(STM32F103C8)
-    ```
-
-4. The next line specifies the handle of the I2C bus in use. Change it as per your schematic.
+    memoree_t mem = memoree_init(MEMOREE_VARIANT_24XX256, &i2c_conf);
     
-    ```c
-    extern I2C_HandleTypeDef hi2c2;                 //handle for the i2c2 bus connected to my 24LC256
-    ```
+  ```
+and for `W25Q16CV`,
 
-## API Reference
+  ```c
+    memoree_spi_conf_t spi_conf =
+        {
+            .port = SPI2_HOST,
+            .mode = 0,
+            .cs_pin = GPIO_NUM_9,
+            .di_pin = GPIO_NUM_10,
+            .do_pin = GPIO_NUM_11,
+            .sck_pin = GPIO_NUM_12,
+            .hd_pin = -1,     // Platform specific, indicates this pin is unused
+            .wp_pin = -1,// Platform specific, indicates this pin is unused
+            .speed = 4000000,
+        };
 
-#### writeByte
-
-Takes a single byte and writes it to the specified memory location.
-
-```c
-void writeByte(addr, sent)
+    memoree_t mem = memoree_init(MEMOREE_VARIANT_25XX_SFDP, &spi_conf);
+    
 ```
 
-| Parameter | Type      | Description                
-| :-------- | :-------  | :------------------------- 
-| `addr`    | `uint16_t`| Address of the memory location to write to.
-| `sent`    | `uint8_t` | The data to be written.
+3. You can get information about your memory chip by calling `memoree_get_info()`
 
-#### readByte
-
-Reads a single byte from the specified memory location into [recv].
-
-```c
-void readByte(addr, recv)
-```
-
-| Parameter | Type      | Description                
-| :-------- | :-------  | :------------------------- 
-| `addr`    | `uint16_t`| Address of the memory location to read from.
-| `recv`    | `uint8_t` | Holds data received from the EEPROM.
-
-
-####  writePage
-
-Takes 64 bytes of data and writes them to the specified page.
-
-```c
-void writePage(page, sent)
-```
-
-| Parameter | Type      | Description                
-| :-------- | :-------  | :------------------------- 
-| `page`    | `uint8_t` | Index of page to be written to (from 0 to 63).
-| `sent`    | `uint8_t*`| Pointer to the array holding the data to be written.
-
-
-### readPage
-
-Reads 64 bytes from the specified page.
-
-```c
-void readPage(page, recv)
-```
-
-| Parameter | Type      | Description                
-| :-------- | :-------  | :------------------------- 
-| `page`    | `uint8_t` | Index of page to be read from (from 0 to 63).
-| `recv`    | `uint8_t*`| Pointer to the array to hold the data received.
-
-
-### pageErase
-
-Erases the specified page by filling it with 1's.
-
-```c
-void pageErase(uint8_t page)
-```
-
-| Parameter | Type      | Description                
-| :-------- | :-------  | :------------------------- 
-| `page`    | `uint8_t` | Index of page to be erased.
-
-
-## Usage/Examples
-Performing a single-page read:
-```c
-
-    uint8_t rData[64] = {0};    //variable to hold received data
-
-    readPage(1, rData);         //read from page one into the variable
-
-```
-- rData will be populated with data from page 1
-
-
-Erasing the entire EEPROM:
-```c
-for(int i = 0;i < 512; i++){
-    pageErase(i);
-}
-```
-- The 24xx256 has 512 physical pages of memory.
-
+4. Read from your memory chip with `memoree_read()` and write with `memoree_write()`
 
 ## License
 
-[MIT](https://choosealicense.com/licenses/mit/)
-
+[MIT](./LICENSE)
