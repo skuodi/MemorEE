@@ -212,8 +212,8 @@ int memoree_write(memoree_t mem, uint32_t addr, uint8_t *data, uint32_t data_len
 /// @brief Provides transparent access to transfer data directly over the underlying protocol.
 /// @note mem must have been memoree_init() 'd as a MEMOREE_VARIANT_STUB_SPI or MEMOREE_VARIANT_STUB_I2C.
 /// @note For I2C, the device address is extracted from the LSByte of the \a addr member of memoree_stub_transaction_t,
-///       and the \a cmd, \a cmd_len and \a dummy_len are ignored
-int memoree_stub_read(memoree_t mem, memoree_stub_transaction_t *t);
+///       and the \a addr_len, \a cmd, \a cmd_len and \a dummy_len are ignored
+int memoree_stub_write_read(memoree_t mem, memoree_stub_transaction_t *t);
 
 /// @brief Write \a erase_value to all the bytes in the specified memory \a page
 memoree_err_t memoree_erase_page(memoree_t mem, uint32_t page, uint8_t erase_value);

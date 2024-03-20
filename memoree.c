@@ -284,8 +284,12 @@ static memoree_err_t _memoree_spi_write_enable(memoree_t mem)
 
 memoree_t memoree_init(memoree_variant_t variant, void *interface_conf)
 {
-  if (!VARIANT_ISVALID(variant) || !interface_conf)
+  if (!interface_conf)
     return NULL;
+
+  if (!VARIANT_ISSTUB(variant))
+    if (!VARIANT_ISVALID(variant))
+      return NULL;
 
   memoree_interface_t interface = NULL;
   uint32_t speed = ((memoree_periph_conf_t *)interface_conf)->speed;
@@ -334,9 +338,13 @@ memoree_t memoree_init(memoree_variant_t variant, void *interface_conf)
     }
   }
 
-  mem->info.speed = speed;
-  mem->info.num_pages = mem->info.size / mem->info.page_size;
-  mem->info.protected = false;
+  if (!VARIANT_ISSTUB(mem->info.variant))
+  {
+    mem->info.speed = speed;
+    mem->info.num_pages = mem->info.size / mem->info.page_size;
+    mem->info.protected = false;
+  }
+    
   return mem;
 }
 
@@ -435,7 +443,7 @@ memoree_err_t memoree_write_byte(memoree_t mem, uint32_t addr, uint8_t data, siz
 
 int memoree_read(memoree_t mem, uint32_t addr, uint8_t *data, uint32_t data_len, size_t timeout_ms)
 {
-  if (!MEMOREE_ISVALID(mem) && !ADDRESS_ISVALID(mem, addr) || !data)
+  if (!MEMOREE_ISVALID(mem) || !ADDRESS_ISVALID(mem, addr) || !data)
     return MEMOREE_ERR_INVALID_ARG;
 
   int ret = MEMOREE_ERR_FAIL;
@@ -501,7 +509,7 @@ int memoree_read(memoree_t mem, uint32_t addr, uint8_t *data, uint32_t data_len,
 
 int memoree_write(memoree_t mem, uint32_t addr, uint8_t *data, uint32_t data_len, size_t timeout_ms, bool wrap)
 {
-  if (!MEMOREE_ISVALID(mem) && !ADDRESS_ISVALID(mem, addr) || !data)
+  if (!MEMOREE_ISVALID(mem) || !ADDRESS_ISVALID(mem, addr) || !data)
     return MEMOREE_ERR_INVALID_ARG;
 
   int32_t bytes_written = 0;
@@ -806,7 +814,7 @@ memoree_err_t memoree_get_sfdp(memoree_t mem, sfdp_param_t *param, size_t timeou
   return MEMOREE_ERR_OK;
 }
 
-int memoree_stub_read(memoree_t mem, memoree_stub_transaction_t *t)
+int memoree_stub_write_read(memoree_t mem, memoree_stub_transaction_t *t)
 {
   if (!mem || !mem->interface || !VARIANT_ISSTUB(mem->info.variant) || !t)
     return MEMOREE_ERR_INVALID_ARG;
@@ -817,7 +825,7 @@ int memoree_stub_read(memoree_t mem, memoree_stub_transaction_t *t)
     ret = platform_i2c_write_read(mem->interface, (uint8_t)t->addr, t->write_buff,
                                   t->write_len, t->read_buff, t->read_len, t->timeout_ms);
   else
-    ret = platform_spi_write_read(mem->interface, t);
+    ret = platform_spi_write_read(mem->interface, (memoree_spi_transaction_t *)t);
 
   return ret;
 }
