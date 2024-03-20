@@ -11,21 +11,6 @@ typedef struct
   void *dev_handle; ///< Memory device handle, optionally use as peripheral handle 
 }memoree_spi_if_t;
 
-/// @brief SPI transaction descriptor
-typedef struct 
-{
-  uint8_t cmd_len;     ///< Command length in bits
-  uint32_t cmd;        ///< Command sent MSB first
-  uint8_t addr_len;    ///< Address length in bits
-  uint32_t addr;       ///< Address, sent MSB first
-  uint8_t dummy_len;   ///< Dummy length in bits
-  uint32_t read_len;   ///< Read length in bytes
-  uint8_t *read_buff;  
-  uint32_t write_len;  ///< Write length in bytes
-  uint8_t *write_buff; 
-  uint32_t timeout_ms; ///< Timeout for the transaction in ms
-}memoree_spi_transaction_t;
-
 /// @brief Initialize an I2C peripheral
 /// @param i2c_conf Interface configuration
 /// @return memoree_interface_t object on success

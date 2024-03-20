@@ -10,6 +10,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/// Library version definitions
+#define MEMOREE_VERSION_MAJOR 0
+#define MEMOREE_VERSION_MINOR 1
+
 #define MEMOREE_I2C_BASE_ADDRESS ((0b1010 << 3) & 0xFF)
 
 #define MEMOREE_I2C_MAX_SPEED 400000
@@ -55,6 +59,7 @@ typedef void *memoree_interface_t;
 /// @todo Implement memory protection enable/disable
 typedef enum
 {
+  MEMOREE_VARIANT_STUB_I2C,
   MEMOREE_VARIANT_24XX02,
   MEMOREE_VARIANT_24XX04,
   MEMOREE_VARIANT_24XX08,
@@ -66,6 +71,7 @@ typedef enum
   MEMOREE_VARIANT_24XX512,
   MEMOREE_VARIANT_24XX1024, ///< For 24XX1024 or 24XX1025
   MEMOREE_VARIANT_I2C_MAX,
+  MEMOREE_VARIANT_STUB_SPI,
   MEMOREE_VARIANT_93C46,
   MEMOREE_VARIANT_93C56,
   MEMOREE_VARIANT_93C66,
@@ -86,7 +92,7 @@ typedef struct
   uint32_t fparam_ptr;    ///< Flash parameter table memory location for use with the SFDP read command
   uint8_t write_size;     ///< Write Granularity
   uint8_t wen_opcode;     ///< Write Enable Opcode Select for Writing to Volatile Status Register
-  uint8_t erase4k_opcode;   ///< 4 Kilobyte Erase Opcode
+  uint8_t erase4k_opcode; ///< 4 Kilobyte Erase Opcode
   uint8_t addr_bytes;     ///< Number of bytes used in addressing flash array read, write and erase
   bool dtr_support;       ///< Whether double transfer rate is supported
   uint8_t min_sector;     ///< Minimum erasable sector size
@@ -125,6 +131,23 @@ typedef struct
   int wp_pin;     ///< Write protect pin
   int mode;       ///< SPI mode
 } memoree_spi_conf_t;
+
+/// @brief SPI transaction descriptor
+typedef struct
+{
+  uint8_t cmd_len;   ///< Command length in bits
+  uint32_t cmd;      ///< Command sent MSB first
+  uint8_t addr_len;  ///< Address length in bits
+  uint32_t addr;     ///< Address, sent MSB first
+  uint8_t dummy_len; ///< Dummy length in bits
+  uint32_t read_len; ///< Read length in bytes
+  uint8_t *read_buff;
+  uint32_t write_len; ///< Write length in bytes
+  uint8_t *write_buff;
+  uint32_t timeout_ms; ///< Timeout for the transaction in ms
+} memoree_spi_transaction_t;
+
+typedef memoree_spi_transaction_t memoree_stub_transaction_t;
 
 typedef enum
 {
@@ -185,6 +208,12 @@ int memoree_read(memoree_t mem, uint32_t addr, uint8_t *data, uint32_t data_len,
 /// @return Number of bytes written, on success
 /// @return \link memoree_err_t \endlink error code, on fail
 int memoree_write(memoree_t mem, uint32_t addr, uint8_t *data, uint32_t data_len, size_t timeout_ms, bool wrap);
+
+/// @brief Provides transparent access to transfer data directly over the underlying protocol.
+/// @note mem must have been memoree_init() 'd as a MEMOREE_VARIANT_STUB_SPI or MEMOREE_VARIANT_STUB_I2C.
+/// @note For I2C, the device address is extracted from the LSByte of the \a addr member of memoree_stub_transaction_t,
+///       and the \a cmd, \a cmd_len and \a dummy_len are ignored
+int memoree_stub_read(memoree_t mem, memoree_stub_transaction_t *t);
 
 /// @brief Write \a erase_value to all the bytes in the specified memory \a page
 memoree_err_t memoree_erase_page(memoree_t mem, uint32_t page, uint8_t erase_value);

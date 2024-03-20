@@ -6,8 +6,9 @@
 #include "memoree.h"
 #include "memoree_platform.h"
 
-#define VARIANT_ISVALID(v) (v != MEMOREE_VARIANT_I2C_MAX && v != MEMOREE_VARIANT_93CXX_MAX && v != MEMOREE_VARIANT_MAX)
-#define MEMOREE_ISVALID(x) (x && x->interface && VARIANT_ISVALID(mem->info.variant))
+#define VARIANT_ISSTUB(v) (v == MEMOREE_VARIANT_STUB_I2C || v == MEMOREE_VARIANT_STUB_SPI)
+#define VARIANT_ISVALID(v) (v < MEMOREE_VARIANT_MAX && v != MEMOREE_VARIANT_I2C_MAX && v != MEMOREE_VARIANT_93CXX_MAX && v != MEMOREE_VARIANT_STUB_SPI && v != MEMOREE_VARIANT_STUB_I2C)
+#define MEMOREE_ISVALID(m) (m && m->interface && VARIANT_ISVALID(m->info.variant))
 #define ADDRESS_ISVALID(m, a) (m && (a < m->info.size))
 #define PAGE_ISVALID(m, p) (m && (p < m->info.num_pages))
 
@@ -25,6 +26,10 @@ typedef struct
 /// @note When adding new entries, ensure the index of entries here matches the values defined in the definitions in \link memoree_variant_t \endlink
 /// @note because the \link memoree_variant_t \endlink value is used by memoree_init() to index directly into this array.
 memoree_info_t mem_props[] = {
+    {
+        .variant = MEMOREE_VARIANT_STUB_I2C,
+        .type = MEMOREE_TYPE_I2C,
+    },
     {
         .variant = MEMOREE_VARIANT_24XX02,
         .type = MEMOREE_TYPE_I2C,
@@ -106,6 +111,10 @@ memoree_info_t mem_props[] = {
         .page_write_delay_ms = 5,
     },
     {}, ///< MEMOREE_VARIANT_I2C_MAX filler structure for alignment
+    {
+        .variant = MEMOREE_VARIANT_STUB_SPI,
+        .type = MEMOREE_TYPE_SPI,
+    },
     {
         .variant = MEMOREE_VARIANT_93C46,
         .type = MEMOREE_TYPE_SPI,
@@ -239,7 +248,7 @@ static int _memoree_write_bytes(memoree_t mem, uint32_t addr, uint8_t *data, uin
 }
 
 /// @brief Send a write enable command to an SPI memory device
-memoree_err_t _memoree_spi_write_enable(memoree_t mem)
+static memoree_err_t _memoree_spi_write_enable(memoree_t mem)
 {
   if (!MEMOREE_ISVALID(mem))
     return MEMOREE_ERR_INVALID_ARG;
@@ -275,7 +284,7 @@ memoree_err_t _memoree_spi_write_enable(memoree_t mem)
 
 memoree_t memoree_init(memoree_variant_t variant, void *interface_conf)
 {
-  if (variant >= MEMOREE_VARIANT_MAX || variant == MEMOREE_VARIANT_I2C_MAX || variant == MEMOREE_VARIANT_93CXX_MAX || !interface_conf)
+  if (!VARIANT_ISVALID(variant) || !interface_conf)
     return NULL;
 
   memoree_interface_t interface = NULL;
@@ -292,10 +301,10 @@ memoree_t memoree_init(memoree_variant_t variant, void *interface_conf)
   }
   else
   {
-    if (variant < MEMOREE_VARIANT_93CXX_MAX)
-      speed = (speed > MEMOREE_SPI_93X_MAX_SPEED) ? MEMOREE_SPI_93X_MAX_SPEED : speed;
-    else if (variant == MEMOREE_VARIANT_25XX_SFDP)
+    if (variant == MEMOREE_VARIANT_25XX_SFDP || variant == MEMOREE_VARIANT_STUB_SPI)
       speed = (speed > MEMOREE_SPI_MAX_SPEED) ? MEMOREE_SPI_MAX_SPEED : speed;
+    else if (variant < MEMOREE_VARIANT_93CXX_MAX)
+      speed = (speed > MEMOREE_SPI_93X_MAX_SPEED) ? MEMOREE_SPI_93X_MAX_SPEED : speed;
 
     ((memoree_spi_conf_t *)interface_conf)->speed = speed;
 
@@ -333,8 +342,12 @@ memoree_t memoree_init(memoree_variant_t variant, void *interface_conf)
 
 memoree_err_t memoree_deinit(memoree_t mem, bool if_deinit)
 {
-  if (!MEMOREE_ISVALID(mem))
+  if (!mem || !mem->interface)
     return MEMOREE_ERR_INVALID_ARG;
+
+  if (mem->info.variant != MEMOREE_VARIANT_STUB_I2C && mem->info.variant != MEMOREE_VARIANT_STUB_SPI)
+    if (!MEMOREE_ISVALID(mem))
+      return MEMOREE_ERR_INVALID_ARG;
 
   if (if_deinit)
   {
@@ -376,8 +389,8 @@ memoree_err_t memoree_ping(memoree_t mem, size_t timeout_ms)
 
 memoree_err_t memoree_read_byte(memoree_t mem, uint32_t addr, uint8_t *data, size_t timeout_ms)
 {
-  int8_t ret = memoree_read(mem, addr, data, 1, timeout_ms);
-  return (ret == 1) ? MEMOREE_ERR_OK : MEMOREE_ERR_FAIL;
+  memoree_err_t ret = memoree_read(mem, addr, data, 1, timeout_ms);
+  return (ret == 1) ? MEMOREE_ERR_OK : ret;
 }
 
 memoree_err_t memoree_write_byte(memoree_t mem, uint32_t addr, uint8_t data, size_t timeout_ms)
@@ -422,7 +435,7 @@ memoree_err_t memoree_write_byte(memoree_t mem, uint32_t addr, uint8_t data, siz
 
 int memoree_read(memoree_t mem, uint32_t addr, uint8_t *data, uint32_t data_len, size_t timeout_ms)
 {
-  if (!ADDRESS_ISVALID(mem, addr) || !data)
+  if (!MEMOREE_ISVALID(mem) && !ADDRESS_ISVALID(mem, addr) || !data)
     return MEMOREE_ERR_INVALID_ARG;
 
   int ret = MEMOREE_ERR_FAIL;
@@ -488,7 +501,7 @@ int memoree_read(memoree_t mem, uint32_t addr, uint8_t *data, uint32_t data_len,
 
 int memoree_write(memoree_t mem, uint32_t addr, uint8_t *data, uint32_t data_len, size_t timeout_ms, bool wrap)
 {
-  if (!ADDRESS_ISVALID(mem, addr) || !data)
+  if (!MEMOREE_ISVALID(mem) && !ADDRESS_ISVALID(mem, addr) || !data)
     return MEMOREE_ERR_INVALID_ARG;
 
   int32_t bytes_written = 0;
@@ -791,4 +804,20 @@ memoree_err_t memoree_get_sfdp(memoree_t mem, sfdp_param_t *param, size_t timeou
   mem->info.size = param->size;
 
   return MEMOREE_ERR_OK;
+}
+
+int memoree_stub_read(memoree_t mem, memoree_stub_transaction_t *t)
+{
+  if (!mem || !mem->interface || !VARIANT_ISSTUB(mem->info.variant) || !t)
+    return MEMOREE_ERR_INVALID_ARG;
+
+  int ret = 0;
+
+  if (mem->info.variant == MEMOREE_VARIANT_STUB_I2C)
+    ret = platform_i2c_write_read(mem->interface, (uint8_t)t->addr, t->write_buff,
+                                  t->write_len, t->read_buff, t->read_len, t->timeout_ms);
+  else
+    ret = platform_spi_write_read(mem->interface, t);
+
+  return ret;
 }
