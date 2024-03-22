@@ -53,6 +53,11 @@ memoree_interface_t platform_i2c_init(memoree_i2c_conf_t *i2c_conf)
   if (err != 0)
     return NULL;
 
+  /// Adjust the I2C clock duty cycle so that it is closer to 50%
+  err = i2c_set_period(i2c_conf->port, 250, 200);
+  if (err != 0)
+    return NULL;
+
   memoree_interface_t interface = malloc(sizeof(int));
   if (interface)
     *((int *)interface) = i2c_conf->port;
