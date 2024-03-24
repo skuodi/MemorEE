@@ -1,7 +1,7 @@
 #ifndef _MEMOREE_PLATFORM_H_
 #define _MEMOREE_PLATFORM_H_
 #include <stdint.h>
-#include "memoree.h"
+#include "../memoree.h"
 
 /// @brief SPI interface handle
 typedef struct 

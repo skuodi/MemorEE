@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "memoree.h"
-#include "memoree_platform.h"
+#include "platform/memoree_platform.h"
 
 #define VARIANT_ISSTUB(v) (v == MEMOREE_VARIANT_STUB_I2C || v == MEMOREE_VARIANT_STUB_SPI)
 #define VARIANT_ISVALID(v) (v < MEMOREE_VARIANT_MAX && v != MEMOREE_VARIANT_I2C_MAX && v != MEMOREE_VARIANT_93CXX_MAX && v != MEMOREE_VARIANT_STUB_SPI && v != MEMOREE_VARIANT_STUB_I2C)

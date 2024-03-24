@@ -10,7 +10,7 @@
 #include "freertos/FreeRTOS.h"
 
 #include "memoree_platform.h"
-#include "memoree.h"
+#include "../memoree.h"
 
 #define MAX(x, y) ((x > y) ? x : y)
 
